@@ -129,7 +129,7 @@ void *uart_rev(){
 			if(ret > 0){
 			// Read up to 255 characters from the port if they are there
 			//rx_length = read(uart0_filestream, (void*)rx_buffer, 255);		//Filestream, buffer to store in, number of bytes to read (max)
-			rx_length = read(uart0_filestream, &rx_data, sizeof(rx_data));		//Filestream, buffer to store in, number of bytes to read (max)		
+			rx_length = read(uart0_filestream, &rx_data, sizeof(rx_data));		//Filestream, buffer to store in, number of bytes to read (max)	
 			if (rx_length < 0)
 			{
 				//An error occured (will occur if there are no bytes)
@@ -176,11 +176,17 @@ void *uart_rev(){
 					//printf("%s", rx_buffer);
 					//for(j=0;j<2;j++)
 					data_acquire = 0;
-					sum = (int)(rx_buffer[i-5]*256) + (int)(rx_buffer[i-4]);
-					printf("the abs value = %d, len=%d, %x %x, \n",sum ,i, rx_buffer[i-5],rx_buffer[i-4]);//,rx_buffer[i-7], rx_buffer[i-5], rx_buffer[i-4],rx_buffer[i-3] ,rx_buffer[i-2],rx_buffer[i-1]);
+					//sum = (int)(rx_buffer[i-5]*256) + (int)(rx_buffer[i-4]);
+					//printf("the abs value = %d, len=%d, %x %x, \n",sum ,i, rx_buffer[i-5],rx_buffer[i-4]);//,rx_buffer[i-7], rx_buffer[i-5], rx_buffer[i-4],rx_buffer[i-3] ,rx_buffer[i-2],rx_buffer[i-1]);
 					//printf("magnetic abs value = %4.4fGa\n", (float)sum*0.92);
-					i=0;
-				#if 1				
+					//i=0;
+				
+					if(rx_buffer[1])
+						fprintf(stderr, "NO.%d parking lot, Avaiable Now\n", rx_buffer[0]);
+					else
+						fprintf(stderr, "NO.%d parking lot, Used Now \n", rx_buffer[1]);
+				#if 0
+							
 					if(sum > 4000 && !current_st_is_ocupied){
 						current_st_is_ocupied = 1;
 						system("curl -H \"Content-Type: application/json\" -d '{\"state\":3}' http://parkingluck.cloudas.info/pl1/rest/parkings/012?token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING");
@@ -220,5 +226,9 @@ int main(int argc, char* argv){
 	while(!get_signal_int){
 		usleep(1);
 	}
+
+	pthread_join(id_uart_rev, NULL);
+
+	return 0;
 
 }
