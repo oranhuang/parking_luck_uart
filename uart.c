@@ -7,11 +7,15 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/select.h>
+#include <string.h>
 
 //char *str = "curl -H "Content-Type: application/json" -d '{"state":3}' http://parkingluck.cloudas.info/pl1/rest/parkings/012?token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING";
 //char *str = {"ad"b"};
 
 volatile sig_atomic_t get_signal_int = 0;
+int TOTAL_PARKING_SPACE;
+int avai_parking_space;
+
 void get_sigint(int a)
 {
 	printf("^C caught\n");
@@ -107,7 +111,9 @@ void *uart_rev(){
 	unsigned char rx_data;
 	int rx_length, i=0, j=0, ret;
 	int sum, end_cnt=0, data_acquire=0;
-	int current_st_is_ocupied = 0;
+	char str_available[8], str_reserved[8];
+	memset(str_available, 0x0, 8);
+	memset(str_reserved, 0x0, 8);
 
 	#if 0
 	int uart0_filestream, len;
@@ -152,6 +158,7 @@ void *uart_rev(){
 				//	rx_buffer[i] = 0;
 				#if 1
 				rx_buffer[i] = rx_data;
+				//fprintf(stderr, "data = %x, index=%d\n", rx_data, i);
 				i++;				
 				switch (rx_data){
 					/* check the tail of the data */
@@ -181,10 +188,22 @@ void *uart_rev(){
 					//printf("magnetic abs value = %4.4fGa\n", (float)sum*0.92);
 					//i=0;
 				
-					if(rx_buffer[1])
-						fprintf(stderr, "NO.%d parking lot, Avaiable Now\n", rx_buffer[0]);
-					else
-						fprintf(stderr, "NO.%d parking lot, Used Now \n", rx_buffer[1]);
+					if(rx_buffer[i-4] == 0x01){
+						fprintf(stderr, "NO.%d parking lot, Is Used Now \n", rx_buffer[i-5]);
+						avai_parking_space--;
+					}
+					else{
+						fprintf(stderr, "NO.%d parking lot, Is Available Now \n", rx_buffer[i-5]);
+						avai_parking_space++;
+						if(avai_parking_space > TOTAL_PARKING_SPACE)
+							avai_parking_space = TOTAL_PARKING_SPACE;						
+					}
+					i = 0;
+
+						sprintf(str_available, "%d", avai_parking_space);
+						sprintf(str_reserved, "%d", TOTAL_PARKING_SPACE - avai_parking_space);
+						system("curl -H \"Content-Type: application/json\" -d '{\"availabecar\":\"24\", \"reservedcar\",\"1\"}' \"http://parkingluck.cloudas.info/pl1/rest/management/PKL1000?id=10203591950055986&token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING\"");
+
 				#if 0
 							
 					if(sum > 4000 && !current_st_is_ocupied){
@@ -212,10 +231,31 @@ void *uart_rev(){
 	return 0;
 }
 
-int main(int argc, char* argv){
-	int ret;
+int main(int argc, char* argv[]){
+	int ret;	
 
 	pthread_t id_uart_rev;
+
+	if(argc < 3){
+		if(argc < 2)
+			fprintf(stderr, "Please enter the numbers of parking space with \"-n\" \n");
+		else
+			fprintf(stderr, "PLEASE input the numbers of parking spaces AGAIN\n");
+		
+		return 0;
+	}
+
+	if(strcmp(argv[1], "-n") == 0){		
+		TOTAL_PARKING_SPACE = atoi(argv[2]);
+		if(TOTAL_PARKING_SPACE == 0){
+			fprintf(stderr, "PLEASE input the numbers of parking spaces AGAIN\n");
+			return 0;
+		}
+	}
+		
+	avai_parking_space = TOTAL_PARKING_SPACE;
+	fprintf(stderr, "total available parking lots are %d\n", avai_parking_space);
+
 	pthread_create(&id_uart_rev, NULL, uart_rev, NULL);
 	if(ret != 0){
 	        fprintf(stderr, "socket_recv thread creation fail!!!\n");
@@ -227,7 +267,7 @@ int main(int argc, char* argv){
 		usleep(1);
 	}
 
-	pthread_join(id_uart_rev, NULL);
+	//pthread_join(id_uart_rev, NULL);
 
 	return 0;
 
