@@ -181,7 +181,7 @@ void *uart_rev(){
 				//fprintf(stderr, "data = %x, index=%d\n", rx_data, i);
 				i++;				
 				switch (rx_data){
-					/* check the tail of the data */
+					/* check the tail of the data , that's the 0xF0 0xF0 0xA0 0xA0*/
 					case 0xF0 :
 						end_cnt ++;					
 						if(end_cnt > 2)
@@ -191,13 +191,13 @@ void *uart_rev(){
 						if(end_cnt == 2){							
 							end_cnt++;
 						}
-						if(end_cnt == 3){					
+						if(end_cnt == 3){
 							data_acquire = 1;
 							end_cnt = 0;
 						}
 						break;
 					default :				
-					break; 
+					break;
 				}
 				if(data_acquire){
 					//printf("%s", rx_buffer);
@@ -270,14 +270,26 @@ void *uart_rev(){
 	return 0;
 }
 
-int main(int argc, char* argv[]){
-	int ret;	
+*void queue_task(){
 
-	pthread_t id_uart_rev;
+	while(1){
+		if(queue_task_count){
+			
+			
+			queue_task_count--;
+		}
+		usleep(1);
+	}
+}
+
+int main(int argc, char* argv[]){
+	int ret;
+
+	pthread_t id_uart_rev, id_queue_task;
 
 	if(argc < 3){
 		if(argc < 2)
-			fprintf(stderr, "Please enter the numbers of parking space with \"-n\" \n");
+			fprintf(stderr, "PLEASE enter the numbers of parking space with \"-n\" \n");
 		else
 			fprintf(stderr, "PLEASE input the numbers of parking spaces AGAIN\n");
 		
@@ -299,6 +311,11 @@ int main(int argc, char* argv[]){
 	ret = pthread_create(&id_uart_rev, NULL, uart_rev, NULL);
 	if(ret != 0){
 	        fprintf(stderr, "socket_recv thread creation fail!!!\n");
+        	return -1;
+        }
+	ret = pthread_create(&id_queue_task, NULL, queue_task, NULL);
+	if(ret != 0){
+	        fprintf(stderr, "queue task thread creation fail!!!\n");
         	return -1;
         }
 
