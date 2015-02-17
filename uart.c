@@ -9,12 +9,28 @@
 #include <sys/select.h>
 #include <string.h>
 
+#define USED		1
+#define AVAILABLE	0
+#define TRUE		1
+#define FALSE		0
 //char *str = "curl -H "Content-Type: application/json" -d '{"state":3}' http://parkingluck.cloudas.info/pl1/rest/parkings/012?token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING";
 //char *str = {"ad"b"};
 
+char *str_1 = "curl -H \"Content-Type: application/json\" -d '{\"availablecar\":\"";
+char *str_2 = "\",\"reservedcar\":\"";
+char *str_3 = "\"}' \"http://parkingluck.cloudas.info/pl1/rest/management/PKL1000?id=10203591950055986&token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING\"";
+
 volatile sig_atomic_t get_signal_int = 0;
-int TOTAL_PARKING_SPACE;
+int TOTAL_PARKING_SPACE = 0;
 int avai_parking_space;
+char str_pool[512];
+typedef struct _Parking_lot_status{	
+	int parking_NO;
+	unsigned char status;
+	unsigned char ack;
+}_parking_lot_status;
+
+_parking_lot_status *pk_lot;
 
 void get_sigint(int a)
 {
@@ -22,6 +38,10 @@ void get_sigint(int a)
 	get_signal_int = 1;
 }
 
+void str_concate(char *str1){
+	strcat(str_pool, str1);
+	return ;
+}
 
 void *uart_rev(){
 	#if 1
@@ -109,8 +129,8 @@ void *uart_rev(){
 	#endif
 	unsigned char rx_buffer[255];
 	unsigned char rx_data;
-	int rx_length, i=0, j=0, ret;
-	int sum, end_cnt=0, data_acquire=0;
+	int rx_length, i=0, ret;
+	int end_cnt=0, data_acquire=0;
 	char str_available[8], str_reserved[8];
 	memset(str_available, 0x0, 8);
 	memset(str_reserved, 0x0, 8);
@@ -189,21 +209,40 @@ void *uart_rev(){
 					//i=0;
 				
 					if(rx_buffer[i-4] == 0x01){
-						fprintf(stderr, "NO.%d parking lot, Is Used Now \n", rx_buffer[i-5]);
-						avai_parking_space--;
+						//fprintf(stderr, "NO.%d parking lot, Is Used Now \n", rx_buffer[i-5]);
+						if(!(pk_lot + rx_buffer[i-5])->ack){
+							(pk_lot + rx_buffer[i-5])->status = USED;
+							(pk_lot + rx_buffer[i-5])->ack = TRUE;
+							avai_parking_space--;
+							fprintf(stderr, "NO.%d parking lot, Is Used Now \n", rx_buffer[i-5]);
+						}
 					}
 					else{
+						if((pk_lot + rx_buffer[i-5])->ack){
+							(pk_lot + rx_buffer[i-5])->status = AVAILABLE;
+							(pk_lot + rx_buffer[i-5])->ack = FALSE;
+						}
 						fprintf(stderr, "NO.%d parking lot, Is Available Now \n", rx_buffer[i-5]);
 						avai_parking_space++;
 						if(avai_parking_space > TOTAL_PARKING_SPACE)
 							avai_parking_space = TOTAL_PARKING_SPACE;						
 					}
 					i = 0;
-
+	
+						memset(str_pool, 0x0, sizeof(str_pool));
 						sprintf(str_available, "%d", avai_parking_space);
 						sprintf(str_reserved, "%d", TOTAL_PARKING_SPACE - avai_parking_space);
-						system("curl -H \"Content-Type: application/json\" -d '{\"availabecar\":\"24\", \"reservedcar\",\"1\"}' \"http://parkingluck.cloudas.info/pl1/rest/management/PKL1000?id=10203591950055986&token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING\"");
+						str_concate(str_1);
+						str_concate(str_available);
+						str_concate(str_2);
+						str_concate(str_reserved);
+						str_concate(str_3);
+						//fprintf(stderr, "%s\n", str_pool);
+						system(str_pool);
+						//system ("curl -H \"Content-Type: application/json\" -d '{\"availablecar\":%t_available,\"reservedcar\":\"50\"}' \"http://parkingluck.cloudas.info/pl1/rest/management/PKL1000?id=10203591950055986&token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING\"");
+						fprintf(stderr, "\n");
 
+						//system("curl -H \"Content-Type: application/json\" -d '{\"availabecar\":str_available, \"reservedcar\",str_reserved}' \"http://parkingluck.cloudas.info/pl1/rest/management/PKL1000?id=10203591950055986&token=MTEzMjU5OTkwOUNBQUNFZEVvc2UwY0JBSURaQW91UXpSWXVIek9zN2ZPeW9JczVVQVpDTk96UnJSSkI1cVc0Z1pBY1lCWkJSczVaQVpBUEtuYWZUUkhueXpwWFVLR1VaQ3VTSHlIbmVud09YcXk0WkIwWkI0eUptbFJoSlU1b1htODkzWGNMOG5IWTgwWEpSM0F6UlpCRFpBWkMxa1pBRGl3cVpBQ3lyWkE5ZnJBVEg4SHNqM1dUTkJKcGJJMzlDUzQ1c1hEeVdTb3FHUPARKINGLUCKLOVEPARKING\"");
 				#if 0
 							
 					if(sum > 4000 && !current_st_is_ocupied){
@@ -254,9 +293,10 @@ int main(int argc, char* argv[]){
 	}
 		
 	avai_parking_space = TOTAL_PARKING_SPACE;
+	pk_lot = malloc(sizeof(_parking_lot_status)*TOTAL_PARKING_SPACE);
 	fprintf(stderr, "total available parking lots are %d\n", avai_parking_space);
 
-	pthread_create(&id_uart_rev, NULL, uart_rev, NULL);
+	ret = pthread_create(&id_uart_rev, NULL, uart_rev, NULL);
 	if(ret != 0){
 	        fprintf(stderr, "socket_recv thread creation fail!!!\n");
         	return -1;
@@ -266,7 +306,8 @@ int main(int argc, char* argv[]){
 	while(!get_signal_int){
 		usleep(1);
 	}
-
+	
+	free(pk_lot);
 	//pthread_join(id_uart_rev, NULL);
 
 	return 0;
