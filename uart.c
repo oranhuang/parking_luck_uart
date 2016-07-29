@@ -51,7 +51,8 @@ void str_concate(char *str1){
 	return ;
 }
 
-void *uart_rev(){
+void *uart_rev()
+{
 	#if 1
 	//-------------------------
 	//----- SETUP USART 0 -----
